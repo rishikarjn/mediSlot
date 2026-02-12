@@ -8,3 +8,13 @@ router.post("/register", register);
 router.post("/login", login);
 
 module.exports = router;
+
+
+const { protect } = require("../middlewares/authMiddleware");
+
+router.get("/me", protect, (req, res) => {
+  res.json({
+    message: "Access granted",
+    user: req.user
+  });
+});
