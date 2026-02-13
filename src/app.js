@@ -10,7 +10,8 @@ app.use(express.json());
 const authRoutes = require("./routes/authRoutes");
 app.use("/api/auth", authRoutes);
 
-app.use("/api/auth", require("./routes/auth"));
+const appointmentRoutes = require("./routes/appointmentsRoutes");
+app.use("/api/appointments", appointmentRoutes);
 
 
 connectDB()
