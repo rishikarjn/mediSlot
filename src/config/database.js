@@ -6,8 +6,6 @@ const connectDB=async()=>{
     
 
     );
-    // console.log("Connected DB:", mongoose.connection.name);
-
 };
 
 module.exports=connectDB;

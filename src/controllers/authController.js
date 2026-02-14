@@ -19,7 +19,7 @@ exports.register = async (req, res) => {
       password:hashedPassword,
       role
     });
-    console.log("Saved User ID:", user._id);
+    // console.log("Saved User ID:", user._id);
 
 
     res.status(201).json({ message: "User registered successfully" });
