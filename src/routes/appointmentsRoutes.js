@@ -13,4 +13,5 @@ router.get("/my", protect, getMyAppointments);
 router.patch("/:id/status", protect, updateAppointmentStatus);
 
 
+
 module.exports = router;
