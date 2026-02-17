@@ -2,7 +2,7 @@ const Appointment = require("../models/appointment");
 
 const createAppointment = async (req, res) => {
   try {
-    const { doctorId, appointmentDate } = req.body;
+    const { doctorId,date,timeSlot } = req.body;
 
     // Only patient can create
     if (req.user.role !== "patient") {
@@ -10,9 +10,10 @@ const createAppointment = async (req, res) => {
     }
 
     const appointment = await Appointment.create({
-      patient: req.user.id,
-      doctor: doctorId,
-      appointmentDate,
+      patientId: req.user.id,
+      doctorId: doctorId,
+      date:date,
+     timeSlot:timeSlot
     });
 
     res.status(201).json({
@@ -20,6 +21,12 @@ const createAppointment = async (req, res) => {
       appointment,
     });
   } catch (error) {
+     if (error.code === 11000) {
+    return res.status(400).json({
+      message: "This time slot is already booked for this doctor"
+    });
+  }
+
     res.status(500).json({ message: error.message });
   }
 };
@@ -30,11 +37,11 @@ const getMyAppointments = async (req, res) => {
     let appointments;
 
     if (req.user.role === "patient") {
-      appointments = await Appointment.find({ patient: req.user.id })
-        .populate("doctor", "name email");
+      appointments = await Appointment.find({ patientId: req.user.id })
+        .populate("doctorId", "name email");
     } else if (req.user.role === "doctor") {
-      appointments = await Appointment.find({ doctor: req.user.id })
-        .populate("patient", "name email");
+      appointments = await Appointment.find({ doctorId: req.user.id })
+        .populate("patientId", "name email");
     }
 
     res.json(appointments);
@@ -56,11 +63,11 @@ const updateAppointmentStatus = async (req, res) => {
     }
 
     // 2️⃣ Validate status value
-    if (!["confirmed", "cancelled"].includes(status)) {
-      return res.status(400).json({
-        message: "Invalid status value"
-      });
-    }
+    // if (!["confirmed", "cancelled"].includes(status)) {
+    //   return res.status(400).json({
+    //     message: "Invalid status value"
+    //   });
+    // }
 
     // 3️⃣ Find appointment
     const appointment = await Appointment.findById(id);
@@ -72,9 +79,25 @@ const updateAppointmentStatus = async (req, res) => {
     }
 
     // 4️⃣ Ensure doctor owns this appointment
-    if (appointment.doctor.toString() !== req.user.id) {
+    if (appointment.doctorId.toString() !== req.user.id) {
       return res.status(403).json({
         message: "You are not authorized to update this appointment"
+      });
+    }
+
+
+    //Transition Rules
+     const currentStatus = appointment.status;
+
+    const validTransitions = {
+      pending: ["confirmed", "cancelled"],
+      confirmed: ["completed"],
+    };
+
+    if (!validTransitions[currentStatus] ||
+        !validTransitions[currentStatus].includes(status)) {
+      return res.status(400).json({
+        message: `Invalid status transition from ${currentStatus} to ${status}`
       });
     }
 

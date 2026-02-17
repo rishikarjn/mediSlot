@@ -10,7 +10,7 @@ const { protect } =
 
 router.post("/", protect, createAppointment);
 router.get("/my", protect, getMyAppointments);
-router.patch("/:id/status", protect, updateAppointmentStatus);
+router.put("/:id/status", protect, updateAppointmentStatus);
 
 
 
