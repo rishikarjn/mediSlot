@@ -14,6 +14,9 @@ app.use("/api/appointments", appointmentRoutes);
 const doctorRoutes = require("./routes/doctorRoutes");
 app.use("/api/doctors", doctorRoutes);
 
+const userRoutes = require("./routes/userRoutes");
+app.use("/api", userRoutes);
+
 
 const autoExpireAppointments = require("./utils/autoExpireAppointments");
 

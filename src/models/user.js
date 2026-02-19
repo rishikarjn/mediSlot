@@ -7,7 +7,9 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ["patient", "doctor"] },
   isActive: { type: Boolean, default: true },
 
-
+specialization: {
+  type: String
+},
   reliabilityScore: {
   type: Number,
   default: 100,
