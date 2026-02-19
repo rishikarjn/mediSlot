@@ -105,6 +105,10 @@ const updateAppointmentStatus = async (req, res) => {
     appointment.status = status;
     await appointment.save();
 
+const updateDoctorReliability = require("../utils/reliabilityCalculator");
+await updateDoctorReliability(appointment.doctorId);
+
+
     res.status(200).json({
       message: "Appointment status updated successfully",
       appointment

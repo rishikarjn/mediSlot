@@ -11,6 +11,10 @@ app.use("/api/auth", authRoutes);
 const appointmentRoutes = require("./routes/appointmentsRoutes");
 app.use("/api/appointments", appointmentRoutes);
 
+const doctorRoutes = require("./routes/doctorRoutes");
+app.use("/api/doctors", doctorRoutes);
+
+
 const autoExpireAppointments = require("./utils/autoExpireAppointments");
 
 connectDB()
