@@ -34,21 +34,58 @@ const createAppointment = async (req, res) => {
 
 const getMyAppointments = async (req, res) => {
   try {
-    let appointments;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
 
-    if (req.user.role === "patient") {
-      appointments = await Appointment.find({ patientId: req.user.id })
-        .populate("doctorId", "name email");
-    } else if (req.user.role === "doctor") {
-      appointments = await Appointment.find({ doctorId: req.user.id })
-        .populate("patientId", "name email");
-    }
+    const skip = (page - 1) * limit;
 
-    res.json(appointments);
+    const total = await Appointment.countDocuments();
+
+    const appointments = await Appointment.find()
+      .populate("doctorId", "name email specialization")
+      .populate("patientId", "name email")
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.status(200).json({
+      success: true,
+      totalRecords: total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      pageSize: limit,
+      data: appointments,
+    });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
+
+
+
+// const getMyAppointments = async (req, res) => {
+//   try {
+//     let appointments;
+
+//     if (req.user.role === "patient") {
+//       appointments = await Appointment.find({ patientId: req.user.id })
+//         .populate("doctorId", "name email");
+//     } else if (req.user.role === "doctor") {
+//       appointments = await Appointment.find({ doctorId: req.user.id })
+//         .populate("patientId", "name email");
+//     }
+
+//     res.json(appointments);
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
 
 const updateAppointmentStatus = async (req, res) => {
   try {
