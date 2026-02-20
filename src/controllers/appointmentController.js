@@ -1,4 +1,5 @@
 const Appointment = require("../models/appointment");
+const User = require("../models/user"); 
 
 const createAppointment = async (req, res) => {
   try {
@@ -156,8 +157,64 @@ await updateDoctorReliability(appointment.doctorId);
   }
 };
 
+
+
+const generateTimeSlots = require("../utils/slotGenerator");
+const scoreSlots = require("../utils/slotScoring");
+
+const smartRecommendSlots = async (req, res) => {
+  try {
+    const { doctorId, patientId, date } = req.query;
+
+    const doctor = await User.findById(doctorId);
+    const selectedDate = new Date(date);
+
+    const dayName = selectedDate.toLocaleDateString("en-US", {
+      weekday: "long",
+    });
+
+    const workingDay = doctor.availableSlots.find(
+      (slot) => slot.day === dayName
+    );
+
+    const allSlots = generateTimeSlots(
+      workingDay.startTime,
+      workingDay.endTime
+    );
+
+    const bookedAppointments = await Appointment.find({
+      doctorId,
+      date: selectedDate,
+      status: { $in: ["pending", "confirmed"] },
+    });
+
+    const bookedSlots = bookedAppointments.map(a => a.timeSlot);
+
+    const availableSlots = allSlots.filter(
+      slot => !bookedSlots.includes(slot)
+    );
+
+    const scoredSlots = await scoreSlots({
+      availableSlots,
+      doctor,
+      patientId,
+      Appointment
+    });
+
+    res.json({
+      success: true,
+      recommendedSlots: scoredSlots.slice(0, 3),
+      totalAvailableSlots: availableSlots.length
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   createAppointment,
   getMyAppointments,
-  updateAppointmentStatus
+  updateAppointmentStatus,
+  smartRecommendSlots
 };
