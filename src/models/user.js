@@ -10,6 +10,19 @@ const userSchema = new mongoose.Schema({
 specialization: {
   type: String
 },
+availableSlots: [
+  {
+    day: {
+      type: String
+    },
+    startTime: {
+      type: String
+    },
+    endTime: {
+      type: String
+    }
+  }
+],
   reliabilityScore: {
   type: Number,
   default: 100,

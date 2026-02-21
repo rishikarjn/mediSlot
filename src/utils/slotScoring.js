@@ -1,8 +1,8 @@
+const Appointment = require("../models/appointment");
 async function scoreSlots({
   availableSlots,
   doctor,
-  patientId,
-  Appointment
+  patientId
 }) {
 
   const scoredSlots = [];

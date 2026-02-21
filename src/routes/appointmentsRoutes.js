@@ -8,7 +8,7 @@ const { protect } =
   require("../middlewares/authMiddleware");
 
 
-const { smartRecommendSlots } = 
+const { smartRecommend} = 
      require("../controllers/appointmentController");
 
 
@@ -18,7 +18,7 @@ const { smartRecommendSlots } =
 router.post("/", protect, createAppointment);
 router.get("/", protect, getMyAppointments);
 router.put("/:id/status", protect, updateAppointmentStatus);
-router.get("/smart-slots", smartRecommendSlots);
+router.post("/smartRecommend", smartRecommend);
 
 
 

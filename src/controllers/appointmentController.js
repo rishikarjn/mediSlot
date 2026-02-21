@@ -3,31 +3,51 @@ const User = require("../models/user");
 
 const createAppointment = async (req, res) => {
   try {
-    const { doctorId,date,timeSlot } = req.body;
+    const { doctorId, date, timeSlot } = req.body;
 
-    // Only patient can create
     if (req.user.role !== "patient") {
       return res.status(403).json({ message: "Only patients can book appointments" });
     }
 
+    const doctor = await User.findById(doctorId);
+
+    if (!doctor || doctor.role !== "doctor") {
+      return res.status(404).json({ message: "Doctor not found" });
+    }
+
+    if (!doctor.availableSlots.includes(timeSlot)) {
+      return res.status(400).json({
+        message: "Selected time slot not available for this doctor"
+      });
+    }
+
+    const selectedDate = new Date(date);
+
+    const existingAppointment = await Appointment.findOne({
+      doctorId,
+      date: selectedDate,
+      timeSlot
+    });
+
+    if (existingAppointment) {
+      return res.status(400).json({
+        message: "This slot is already booked"
+      });
+    }
+
     const appointment = await Appointment.create({
       patientId: req.user.id,
-      doctorId: doctorId,
-      date:date,
-     timeSlot:timeSlot
+      doctorId,
+      date: selectedDate,
+      timeSlot
     });
 
     res.status(201).json({
       message: "Appointment booked successfully",
       appointment,
     });
-  } catch (error) {
-     if (error.code === 11000) {
-    return res.status(400).json({
-      message: "This time slot is already booked for this doctor"
-    });
-  }
 
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
@@ -37,12 +57,19 @@ const getMyAppointments = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
-
     const skip = (page - 1) * limit;
 
-    const total = await Appointment.countDocuments();
+    let filter = {};
 
-    const appointments = await Appointment.find()
+    if (req.user.role === "patient") {
+      filter.patientId = req.user.id;
+    } else if (req.user.role === "doctor") {
+      filter.doctorId = req.user.id;
+    }
+
+    const total = await Appointment.countDocuments(filter);
+
+    const appointments = await Appointment.find(filter)
       .populate("doctorId", "name email specialization")
       .populate("patientId", "name email")
       .sort({ date: -1 })
@@ -162,50 +189,48 @@ await updateDoctorReliability(appointment.doctorId);
 const generateTimeSlots = require("../utils/slotGenerator");
 const scoreSlots = require("../utils/slotScoring");
 
-const smartRecommendSlots = async (req, res) => {
+const smartRecommend = async (req, res) => {
   try {
-    const { doctorId, patientId, date } = req.query;
+    const { doctorId, patientId, date } = req.body;
 
     const doctor = await User.findById(doctorId);
-    const selectedDate = new Date(date);
 
-    const dayName = selectedDate.toLocaleDateString("en-US", {
-      weekday: "long",
-    });
+if (!doctor) {
+  return res.status(404).json({ message: "Doctor not found" });
+}
 
-    const workingDay = doctor.availableSlots.find(
-      (slot) => slot.day === dayName
-    );
+if (!doctor.availableSlots || doctor.availableSlots.length === 0) {
+  return res.status(400).json({
+    message: "Doctor working hours not set"
+  });
+}
 
-    const allSlots = generateTimeSlots(
-      workingDay.startTime,
-      workingDay.endTime
-    );
+const selectedDate = new Date(date);
 
-    const bookedAppointments = await Appointment.find({
-      doctorId,
-      date: selectedDate,
-      status: { $in: ["pending", "confirmed"] },
-    });
+const bookedAppointments = await Appointment.find({
+  doctorId,
+  date: selectedDate,
+  status: { $in: ["pending", "confirmed"] }
+});
 
-    const bookedSlots = bookedAppointments.map(a => a.timeSlot);
+const bookedSlots = bookedAppointments.map(a => a.timeSlot);
 
-    const availableSlots = allSlots.filter(
-      slot => !bookedSlots.includes(slot)
-    );
+const availableSlots = doctor.availableSlots.filter(
+  slot => !bookedSlots.includes(slot)
+);
 
-    const scoredSlots = await scoreSlots({
-      availableSlots,
-      doctor,
-      patientId,
-      Appointment
-    });
+const scoredSlots = await scoreSlots({
+  availableSlots,
+  doctor,
+  patientId,
+  Appointment
+});
 
-    res.json({
-      success: true,
-      recommendedSlots: scoredSlots.slice(0, 3),
-      totalAvailableSlots: availableSlots.length
-    });
+res.json({
+  success: true,
+  recommendedSlots: scoredSlots.slice(0, 3),
+  totalAvailableSlots: availableSlots.length
+});
 
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -216,5 +241,5 @@ module.exports = {
   createAppointment,
   getMyAppointments,
   updateAppointmentStatus,
-  smartRecommendSlots
+  smartRecommend
 };
