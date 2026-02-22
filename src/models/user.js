@@ -6,35 +6,16 @@ const userSchema = new mongoose.Schema({
   password: String,
   role: { type: String, enum: ["patient", "doctor"] },
   isActive: { type: Boolean, default: true },
-
-specialization: {
-  type: String
+availableSlots: {
+  type: [String],
+  default: ["09:00 - 09:30", "09:30 - 10:00", "10:00 - 10:30"]
 },
-availableSlots: [
-  {
-    day: {
-      type: String
-    },
-    startTime: {
-      type: String
-    },
-    endTime: {
-      type: String
-    }
-  }
-],
-  reliabilityScore: {
-  type: Number,
-  default: 100,
-  min: 0,
-  max: 100
-}
 
 }, { timestamps: true });
 
 
 
-
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.models.User || mongoose.model("User", userSchema);
+// module.exports = mongoose.model("User", userSchema);
 
 

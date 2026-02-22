@@ -1,48 +1,76 @@
 const Appointment = require("../models/appointment");
+
 async function scoreSlots({
   availableSlots,
   doctor,
   patientId
 }) {
+  try {
+    const scoredSlots = [];
 
-  const scoredSlots = [];
-
-  // Get patient history
-  const pastAppointments = await Appointment.find({
-    patientId: patientId,
-    status: "completed",
-  });
-
-  const preferredSlots = pastAppointments.map(a => a.timeSlot);
-
-  for (let slot of availableSlots) {
-
-    let score = 0;
-
-    // 1️⃣ Doctor reliability (50%)
-    score += doctor.reliabilityScore * 0.5;
-
-    // 2️⃣ Patient preferred slot bonus
-    if (preferredSlots.includes(slot)) {
-      score += 20;
-    }
-
-    // 3️⃣ Slot popularity (less booked = better)
-    const bookingCount = await Appointment.countDocuments({
-      doctorId: doctor._id,
-      timeSlot: slot,
+    // 1️⃣ Get patient completed appointment history
+    const pastAppointments = await Appointment.find({
+      patientId: patientId,
       status: "completed",
+    }).select("timeSlot");
+
+    const preferredSlots = pastAppointments.map(a => a.timeSlot);
+
+    // 2️⃣ Get slot popularity in ONE query (performance optimized)
+    const bookings = await Appointment.aggregate([
+      {
+        $match: {
+          doctorId: doctor._id,
+          status: "completed",
+        },
+      },
+      {
+        $group: {
+          _id: "$timeSlot",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Convert aggregation result into map for fast lookup
+    const bookingMap = {};
+    bookings.forEach(b => {
+      bookingMap[b._id] = b.count;
     });
 
-    score += (10 - bookingCount);
+    // 3️⃣ Score each slot
+    for (let slot of availableSlots) {
+      let score = 0;
 
-    scoredSlots.push({ slot, score });
+       if (doctor.reliabilityScore) {
+        score += doctor.reliabilityScore * 5;
+      }
+
+      // ✅ Patient preferred slot bonus (strong personalization)
+      if (preferredSlots.includes(slot)) {
+        score += 30;
+      }
+
+      // ✅ Slot popularity logic
+      const bookingCount = bookingMap[slot] || 0;
+
+      // Less booked = higher score
+      score += (15 - bookingCount * 2);
+
+      // Prevent negative score
+      if (score < 0) score = 0;
+      scoredSlots.push({ slot, score });
+    }
+
+    // 4️⃣ Sort highest score first
+    scoredSlots.sort((a, b) => b.score - a.score);
+
+    return scoredSlots;
+
+  } catch (error) {
+    console.error("Error scoring slots:", error);
+    throw error;
   }
-
-  // Sort by highest score
-  scoredSlots.sort((a, b) => b.score - a.score);
-
-  return scoredSlots;
 }
 
 module.exports = scoreSlots;

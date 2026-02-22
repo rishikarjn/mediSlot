@@ -1,5 +1,5 @@
 const Appointment = require("../models/appointment");
-const User = require("../models/user"); 
+const User = require("../models/User"); 
 
 const createAppointment = async (req, res) => {
   try {
@@ -10,16 +10,21 @@ const createAppointment = async (req, res) => {
     }
 
     const doctor = await User.findById(doctorId);
+//  const doctor = await Doctor.findById(doctorId);
 
     if (!doctor || doctor.role !== "doctor") {
       return res.status(404).json({ message: "Doctor not found" });
     }
 
-    if (!doctor.availableSlots.includes(timeSlot)) {
-      return res.status(400).json({
-        message: "Selected time slot not available for this doctor"
-      });
-    }
+  if (
+  doctor.role !== "doctor" ||
+  !doctor.availableSlots ||
+  !doctor.availableSlots.includes(timeSlot)
+) {
+  return res.status(400).json({
+    message: "Selected time slot not available for this doctor"
+  });
+}
 
     const selectedDate = new Date(date);
 
@@ -155,7 +160,7 @@ const updateAppointmentStatus = async (req, res) => {
      const currentStatus = appointment.status;
 
     const validTransitions = {
-      pending: ["confirmed", "cancelled"],
+      pending: ["confirmed", "cancelled","completed"],
       confirmed: ["completed"],
     };
 
@@ -186,54 +191,70 @@ await updateDoctorReliability(appointment.doctorId);
 
 
 
+
+const Doctor = require("../models/doctor");
 const generateTimeSlots = require("../utils/slotGenerator");
 const scoreSlots = require("../utils/slotScoring");
 
 const smartRecommend = async (req, res) => {
   try {
-    const { doctorId, patientId, date } = req.body;
+    const { doctorId, patientId } = req.body;
 
-    const doctor = await User.findById(doctorId);
+    // 1️⃣ Fetch doctor
+    const doctor = await Doctor.findById(doctorId);
 
-if (!doctor) {
-  return res.status(404).json({ message: "Doctor not found" });
-}
+    if (!doctor) {
+      return res.status(404).json({ message: "Doctor not found" });
+    }
 
-if (!doctor.availableSlots || doctor.availableSlots.length === 0) {
-  return res.status(400).json({
-    message: "Doctor working hours not set"
-  });
-}
+    // 2️⃣ Generate all possible slots (using working hours)
+    // You can store these in doctor model later
+    const startTime = doctor.startTime || "09:00";
+    const endTime = doctor.endTime || "17:00";
+    const interval = doctor.slotDuration || 30;
 
-const selectedDate = new Date(date);
+    const allSlots = generateTimeSlots(startTime, endTime, interval);
 
-const bookedAppointments = await Appointment.find({
-  doctorId,
-  date: selectedDate,
-  status: { $in: ["pending", "confirmed"] }
-});
+    // 3️⃣ Fetch already booked slots (excluding cancelled)
+    const bookedAppointments = await Appointment.find({
+      doctorId: doctorId,
+      status: { $ne: "cancelled" },
+    }).select("timeSlot");
 
-const bookedSlots = bookedAppointments.map(a => a.timeSlot);
+    const bookedSlots = bookedAppointments.map(a => a.timeSlot);
 
-const availableSlots = doctor.availableSlots.filter(
-  slot => !bookedSlots.includes(slot)
-);
+    // 4️⃣ Filter available slots
+    const availableSlots = allSlots.filter(
+      slot => !bookedSlots.includes(slot)
+    );
 
-const scoredSlots = await scoreSlots({
-  availableSlots,
-  doctor,
-  patientId,
-  Appointment
-});
+    if (availableSlots.length === 0) {
+      return res.status(200).json({
+        message: "No available slots",
+        recommendedSlots: [],
+      });
+    }
 
-res.json({
-  success: true,
-  recommendedSlots: scoredSlots.slice(0, 3),
-  totalAvailableSlots: availableSlots.length
-});
+    // 5️⃣ Score available slots
+    const scoredSlots = await scoreSlots({
+      availableSlots,
+      doctor,
+      patientId,
+    });
 
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    // 6️⃣ Return top 3 recommended slots
+    const topRecommendations = scoredSlots.slice(0, 3);
+
+    res.status(200).json({
+      doctor: doctor.name,
+      recommendedSlots: topRecommendations,
+    });
+
+  } catch (error) {
+    console.error("Smart Recommendation Error:", error);
+    res.status(500).json({
+      message: "Internal server error",
+    });
   }
 };
 

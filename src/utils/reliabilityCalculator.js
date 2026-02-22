@@ -1,5 +1,5 @@
 const Appointment = require("../models/appointment");
-const User = require("../models/user");
+const User = require("../models/User"); 
 
 const updateDoctorReliability = async (doctorId) => {
   try {
